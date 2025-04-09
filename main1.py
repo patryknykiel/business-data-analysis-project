@@ -17,10 +17,8 @@ apiLinks = ["https://api.gios.gov.pl/pjp-api/v1/rest/data/getData/20277", "https
             "https://api.gios.gov.pl/pjp-api/v1/rest/data/getData/4385", "https://api.gios.gov.pl/pjp-api/v1/rest/data/getData/4391"]
 
 
-
-
-historicApiLinks = ["https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDataBySensor/16343",
-                    "https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDataBySensor/20277",
+historicApiLinks = ["https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDataBySensor/20277",
+                    "https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDataBySensor/16343",
                     "https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDataBySensor/4391",
                     "https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDataBySensor/16344",
                     "https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDataBySensor/4385",
@@ -29,7 +27,9 @@ historicApiLinks = ["https://api.gios.gov.pl/pjp-api/v1/rest/archivalData/getDat
 
 
 def getTodaysData():
-    todayData = {}
+    todayData = {
+        "Date": [],
+    }
     for sensor in apiLinks:
         dateList = []
         valueList = []
@@ -40,17 +40,11 @@ def getTodaysData():
                 dateList.append(data[i]['Data'])
                 valueList.append(data[i]['Wartość'])
 
+            if len(todayData["Date"]) == 0:
+                todayData.update({"Date": dateList})
             todayData.update({data[i]['Kod stanowiska']: valueList})
-    todayData.update({"Date": dateList})
 
-
-
-    return pd.DataFrame(todayData)
-
-
-
-# czasem jest tak ze brakuje danych z jednej lub wielu godzin ale nie tak ze null tylko ze po prostu omija sie dana godzine
-# napisz ifa ze jezeli kolejna godzina nie jest +1 to trzeba dodac "recznie" datę +1 i wartość null
+    return pd.DataFrame(todayData).sort_values(by=['Date'])
 
 def getHistoricDataOnly20Days(dateFrom, dateTo):
 
@@ -79,31 +73,36 @@ def getHistoricDataOnly20Days(dateFrom, dateTo):
 
     historicData = {}
 
+    dateList = []
+    dateList.append(str(dateF))
+
+    k = 0
+
+    while k < (dateT - dateF).total_seconds() / 3600:
+        dateList.insert(k + 1, str(pd.to_datetime(dateList[k]) + datetime.timedelta(hours=1)))
+        k += 1
+
+    historicData.update({"Date": dateList})
+
     for sensor in historicApiLinks:
-        dateList = []
         valueList = []
+        time.sleep(15)
         response = requests.get(f'{sensor}?size=500&dateFrom={dateF.date()}%20{dateFromHour}%3A{dateFromMinute}'
                                 f'&dateTo={dateT.date()}%20{dateToHour}%3A{dateToMinute}').json()
 
         data = response['Lista archiwalnych wyników pomiarów']
-        #print(len(data))
 
-        for i in range(len(data)):
-            dateList.append(data[i]['Data'])
-            valueList.append(data[i]['Wartość'])
+        for date in dateList:
+            for i in range(len(data)):
+                if date == (data[i]['Data']):
+                    valueList.append(data[i]['Wartość'])
+                    break
+                elif i == len(data)-1:
+                    valueList.append("")
 
         historicData.update({data[i]['Kod stanowiska']: valueList})
 
-        time.sleep(20)
-        historicData.update({"Date": dateList})
-
-
-
     return pd.DataFrame(historicData)
 
-
-print(getHistoricDataOnly20Days("2022-04-06 15:00", "2022-04-07 19:00"))
-#getTodaysData().to_csv('TodaysData.csv', index=False)
-
-
-
+#getHistoricDataOnly20Days("2023-03-20 00:00", "2023-04-07 00:00").to_csv('HistoricDataOnly20Days.csv', index=False)
+getTodaysData().to_csv('TodaysData.csv', index=False)

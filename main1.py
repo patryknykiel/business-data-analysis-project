@@ -105,7 +105,27 @@ def getHistoricDataOnly20Days(dateFrom, dateTo):
 
     return pd.DataFrame(historicData)
 
-# Stała kolejność kolumn, jaką chcesz uzyskać
+
+def get24hData():
+    PL_datetime_now = (datetime.datetime.today())
+    PL_datetime_24h_earlier = PL_datetime_now - datetime.timedelta(hours=24)
+
+    PL_datetime_now_day = PL_datetime_now.date().day
+    PL_datetime_now_month = PL_datetime_now.date().month
+    PL_datetime_now_year = PL_datetime_now.date().year
+    PL_datetime_24h_earlier_day = PL_datetime_24h_earlier.date().day
+    PL_datetime_24h_earlier_month = PL_datetime_24h_earlier.date().month
+    PL_datetime_24h_earlier_year = PL_datetime_24h_earlier.date().year
+    PL_datetime_now_hour = PL_datetime_now.time().hour
+    PL_datetime_24h_earlier_hour = PL_datetime_24h_earlier.time().hour
+
+    adapted_PL_datetime_now = datetime.datetime(PL_datetime_now_year, PL_datetime_now_month, PL_datetime_now_day,PL_datetime_now_hour, 0 )
+    adapted_PL_PL_datetime_24h_earlier = datetime.datetime(PL_datetime_24h_earlier_year,PL_datetime_24h_earlier_month,PL_datetime_24h_earlier_day,PL_datetime_24h_earlier_hour, 0 )
+
+    return getHistoricDataOnly20Days(adapted_PL_PL_datetime_24h_earlier, adapted_PL_datetime_now)
+
+
+#Stała kolejność kolumn, jaką chcesz uzyskać
 column_order = [
     'Date',
     'PkRzeszPilsu-PM2.5-1g',
@@ -113,21 +133,23 @@ column_order = [
     'PkRzeszPilsu-CO-1g',
     'PkRzeszPilsu-NO2-1g',
     'PkRzeszRejta-O3-1g',
-    'PkRzeszRejta-SO2-1g'
-]
+    'PkRzeszRejta-SO2-1g']
 
 def reorder_columns(df, column_order):
     # Upewnij się, że DataFrame ma te same kolumny, co column_order
     df = df[column_order]
     return df
 
-df_today = getTodaysData()
-df_today = reorder_columns(df_today, column_order)
-df_today.to_csv('TodaysData.csv', index=False)
+#df_today = getTodaysData()
+#df_today = reorder_columns(df_today, column_order)
+#df_today.to_csv('TodaysData.csv', index=False)
+#df_24h_earlier = get24hData()
+#df_24h_earlier = reorder_columns(df_24h_earlier, column_order)
+#df_24h_earlier.to_csv('24h.csv', index=False)
 
-df_historic=getHistoricDataOnly20Days("2025-02-01 00:00", "2025-02-19 00:00")
-df_historic = reorder_columns(df_historic, column_order)
-df_historic.to_csv('HistoricDataOnly20Days.csv', index=False)
+#df_historic=getHistoricDataOnly20Days("2025-02-01 00:00", "2025-02-19 00:00")
+#df_historic = reorder_columns(df_historic, column_order)
+#df_historic.to_csv('HistoricDataOnly20Days.csv', index=False)
 
 def caqi_pm10(value):
     if pd.isna(value): return None
@@ -236,11 +258,14 @@ def add_caqi_column(df):
 
     return df
 
-df_today_with_caqi = add_caqi_column(df_today)
-df_today_with_caqi.to_csv("TodaysData_with_CAQI.csv", index=False)
+#df_today_with_caqi = add_caqi_column(df_today)
+#df_today_with_caqi.to_csv("TodaysData_with_CAQI.csv", index=False)
+#df_24h_earlier_with_caqi = add_caqi_column(df_24h_earlier)
+#df_24h_earlier_with_caqi.to_csv("24h_with_CAQI.csv", index=False)
 
-df_historic_with_caqi=add_caqi_column(df_historic)
-df_historic_with_caqi.to_csv("HistoricData_with_CAQI.csv", index=False)
+
+#df_historic_with_caqi=add_caqi_column(df_historic)
+#df_historic_with_caqi.to_csv("HistoricData_with_CAQI.csv", index=False)
 
 pollutions = ["PM2.5", "PM10", "CO", "NO2", "O3", "SO2"]
 
@@ -324,12 +349,84 @@ def TodaysCAQIPlot(data):
         plt.show()
 
 
-file_path1 = 'HistoricData_with_CAQI.csv'
-file_path2 = 'TodaysData_with_CAQI.csv'
+def CAQIPlot24h(data):
+    data['Date'] = pd.to_datetime(data['Date'])
+
+    start_time = data['Date'].min()
+    end_time = start_time + pd.Timedelta(hours=24)
+
+    # Filtrowanie od startu przez 24h
+    data = data[(data['Date'] >= start_time) & (data['Date'] < end_time)]
+
+    for pollution in pollutions:
+        col_name = find_pollution_column(data, pollution)
+        if col_name is None:
+            print(f"Nie znaleziono kolumny dla {pollution}.")
+            continue
+
+        data[col_name] = pd.to_numeric(data[col_name], errors='coerce')
+
+        times = []
+        caqi_values = []
+        for i, temp in enumerate(data['Date']):
+            value = data[col_name].iloc[i]
+
+            if pd.isna(value):
+                continue
+
+            if pollution == 'PM2.5':
+                caqi = caqi_pm25(value)
+            elif pollution == 'PM10':
+                caqi = caqi_pm10(value)
+            elif pollution == 'CO':
+                caqi = caqi_co(value)
+            elif pollution == 'NO2':
+                caqi = caqi_no2(value)
+            elif pollution == 'O3':
+                caqi = caqi_o3(value)
+            elif pollution == 'SO2':
+                caqi = caqi_so2(value)
+            else:
+                continue
+
+            times.append(temp)
+            caqi_values.append(caqi)
+
+        if not times:
+            print(f"Brak danych do wyświetlenia dla {pollution}.")
+            continue
+
+        plot_data = pd.DataFrame({'Time': times, 'CAQI': caqi_values})
+        plot_data = plot_data.sort_values('Time')
+
+        # Wykres
+        plt.figure(figsize=(12, 6))
+        plt.plot(plot_data['Time'], plot_data['CAQI'], marker='o', linestyle='-', markersize=5, color='blue')
+
+        plt.title(
+            f"Godzinowy CAQI ({pollution}) - {start_time.strftime('%Y-%m-%d %H:%M')} do {end_time.strftime('%Y-%m-%d %H:%M')}")
+        plt.xlabel("Godzina")
+        plt.ylabel("CAQI")
+
+        max_caqi = plot_data['CAQI'].max()
+        plt.ylim(0, max(100, max_caqi + 5))
+
+        draw_caqi_background(plt)
+        plt.grid(True)
+        plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=1))
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+
+
+
+file_path1 = '24h_with_CAQI.csv'
+#file_path2 = 'TodaysData_with_CAQI.csv'
 
 # Wczytanie pliku CSV do DataFrame
 h = pd.read_csv(file_path1)
-d = pd.read_csv(file_path2)
+#d = pd.read_csv(file_path2)
 
 
 
@@ -395,5 +492,5 @@ def HistoricCAQIPlot(data):
         plt.show()
 
 # Wywołanie funkcji
-HistoricCAQIPlot(h)
-TodaysCAQIPlot(d)
+#HistoricCAQIPlot(h)
+CAQIPlot24h(h)

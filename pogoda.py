@@ -22,17 +22,33 @@ def getTodaysVisualCrossingData(api_key: str, location: str = "Rzeszow,PL"):
     response.raise_for_status()
     data = response.json()
 
+    # Najpierw próbujemy wziąć tylko 'obs'
     hours = [hour for hour in data["days"][0]["hours"] if hour.get("source") == "obs"]
 
+    # Jeśli nie ma danych 'obs', bierzemy wszystkie godziny
+    if not hours:
+        print("No 'obs' data found. Using all hourly data instead.")
+        hours = data["days"][0]["hours"]
+
     df = pd.json_normalize(hours)
-    date = data["days"][0]["datetime"]
-    df["Date"] = pd.to_datetime(date + " " + df["datetime"])
-    df.drop(columns=["datetime"], inplace=True)
-    df = df[["Date"] + [col for col in df.columns if col != "Date"]]
 
-    df.to_csv("visualCrossing_today_obs.csv", index=False)
-    print("Saved only 'obs' data to visualCrossing_today_obs.csv")
+    # Sprawdźmy jaka jest nazwa kolumny z czasem
+    datetime_column = None
+    for col in df.columns:
+        if "datetime" in col and not col.startswith("datetimeEpoch"):
+            datetime_column = col
+            break
 
+    if datetime_column:
+        date = data["days"][0]["datetime"]
+        df["Date"] = pd.to_datetime(date + " " + df[datetime_column])
+        df.drop(columns=[datetime_column], inplace=True)
+        df = df[["Date"] + [col for col in df.columns if col != "Date"]]
+
+        df.to_csv("visualCrossing_today_obs.csv", index=False)
+        print("Saved weather data to visualCrossing_today_obs.csv")
+    else:
+        print("No datetime column found in data.")
 def getHistoricDataOnly20DaysVisualCrossing(api_key: str, location: str = "Rzeszow,PL"):
     end_date = datetime.datetime.now().date()
     start_date = end_date - timedelta(days=19)

@@ -3,17 +3,13 @@ from sklearn.model_selection import train_test_split
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Wczytanie danych z pliku Excel
 data = pd.read_excel("2023 dane.xlsx")
 
 # Zamiana kolumny 'Date' na datę
 data['Date'] = pd.to_datetime(data['Date'], format='%d.%m.%Y %H:%M')
-
-# Ekstrakcja cech czasowych (możesz je pominąć jeśli nie są potrzebne)
-data['hour'] = data['Date'].dt.hour
-data['day_of_week'] = data['Date'].dt.dayofweek
-data['month'] = data['Date'].dt.month
 
 # Zastąpienie brakujących wartości metodą interpolacji
 data.fillna(data.mean(), inplace=True)
@@ -108,7 +104,7 @@ def caqi_description(value):
     else: return "Bardzo zły"
 
 # Funkcja do obliczenia CAQI
-def compute_caqi_row(row):
+def compute_caqi_row_train(row):
     values = []
     if 'PkRzeszPilsu-PM2.5-1g' in row: values.append(caqi_pm25(row['PkRzeszPilsu-PM2.5-1g']))
     if 'PkRzeszPilsu-PM10-1g' in row: values.append(caqi_pm10(row['PkRzeszPilsu-PM10-1g']))
@@ -120,7 +116,8 @@ def compute_caqi_row(row):
     return max(values) if values else None
 
 # Obliczanie CAQI dla każdej próbki
-data['CAQI'] = data.apply(compute_caqi_row, axis=1)
+data['CAQI'] = data.apply(compute_caqi_row_train, axis=1)
+data.to_csv('2023_data_with_CAQI.csv', index=False)
 
 # Usunięcie wierszy z brakiem wartości CAQI (jeśli jakieś istnieją)
 data = data.dropna(subset=['CAQI'])
@@ -152,6 +149,33 @@ print(f'RMSE: {rmse:.2f}')
 
 # Zapisanie modelu do pliku
 model.save_model('xgboost_regressor.model')
+
+
+
+#Ważność cech – pobranie z modelu
+importance = model.feature_importances_
+feature_names = features
+
+# Stworzenie DataFrame z wynikami
+importance_df = pd.DataFrame({
+    'Cecha': feature_names,
+    'Waznosc': importance
+}).sort_values(by='Waznosc', ascending=False)
+
+# 👇 Wyświetlenie tabeli w terminalu / notebooku
+print("\nWażność cech według XGBoost:")
+print(importance_df)
+
+# 🔥 Wykres ważności cech
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Cecha'], importance_df['Waznosc'], color='skyblue')
+plt.xlabel('Ważność')
+plt.title('Ważność cech w modelu XGBoost')
+plt.gca().invert_yaxis()  # Najważniejsze na górze
+plt.tight_layout()
+plt.savefig('XGBoost_Feature_Importance.png')  # Zapisz wykres do pliku
+plt.show()
+
 
 # Przewidywanie dla nowych danych
 todays_data = pd.read_csv('TodaysData_with_CAQI.csv')
@@ -191,6 +215,10 @@ todays_data.to_csv('TodaysData_XGBoost_CAQI.csv', index=False)
 
 print("Przewidywania zostały zapisane do pliku TodaysData_XGBoost_CAQI.csv")
 
+
+
+
+
 # Przewidywanie dla danych historycznych
 historic_data = pd.read_csv('HistoricData_with_CAQI.csv')
 
@@ -204,3 +232,18 @@ historic_data['Predicted_CAQI_Desc'] = historic_data['Predicted_CAQI'].apply(caq
 historic_data.to_csv('HistoricData_XGBoost_CAQI.csv', index=False)
 
 print("Przewidywania zostały zapisane do pliku HistoricData_XGBoost_CAQI.csv")
+
+
+# Przewidywanie dla danych historycznych
+last24h_data = pd.read_csv('24HData_with_CAQI.csv')
+
+# Przewidywanie wartości CAQI z uwzględnieniem braku zanieczyszczeń
+last24h_data['Predicted_CAQI'] = last24h_data[features].apply(predict_caqi, axis=1)
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+last24h_data['Predicted_CAQI_Desc'] = last24h_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+last24h_data.to_csv('24HData_XGBoost_CAQI.csv', index=False)
+
+print("Przewidywania zostały zapisane do pliku 24HData_XGBoost_CAQI.csv")

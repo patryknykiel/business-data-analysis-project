@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeRegressor
 import joblib
+import matplotlib.pyplot as plt
 
 # Funkcje do obliczania CAQI
 def caqi_pm10(value):
@@ -93,7 +94,29 @@ tree_model.fit(X, y)
 joblib.dump(tree_model, 'decision_tree_regressor.pkl')
 print("Model drzewa decyzyjnego został zapisany.")
 
-# Funkcja przewidująca
+#Ważność cech – z drzewa decyzyjnego
+importance = tree_model.feature_importances_
+feature_names = features
+
+# Tworzenie tabeli DataFrame
+importance_df = pd.DataFrame({
+    'Cecha': feature_names,
+    'Waznosc': importance
+}).sort_values(by='Waznosc', ascending=False)
+
+# Wyświetlenie tabeli
+print("\nWażność cech według Decision Tree:")
+print(importance_df)
+
+#Wykres ważności
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Cecha'], importance_df['Waznosc'], color='skyblue')
+plt.xlabel('Ważność')
+plt.title('Ważność cech w modelu Decision Tree')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+plt.show()
+
 # Funkcja przewidująca
 def predict_caqi(row):
     if row.isna().sum() == len(row):
@@ -119,3 +142,14 @@ historic_data['Predicted_CAQI_Desc'] = historic_data['Predicted_CAQI'].apply(caq
 
 historic_data.to_csv('HistoricData_DecisionTree_CAQI.csv', index=False)
 print("Przewidywania dla danych historycznych zapisane.")
+
+
+
+# Przewidywanie dla danych historycznych
+last24h_data = pd.read_csv('24HData_with_CAQI.csv')
+
+last24h_data['Predicted_CAQI'] = last24h_data[features].apply(predict_caqi, axis=1)
+last24h_data['Predicted_CAQI_Desc'] = last24h_data['Predicted_CAQI'].apply(caqi_description)
+
+last24h_data.to_csv('24HData_DecisionTree_CAQI.csv', index=False)
+print("Przewidywania dla danych 24-godzinnych zapisane.")

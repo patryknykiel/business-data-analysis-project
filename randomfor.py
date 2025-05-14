@@ -3,6 +3,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 import numpy as np
+import joblib
+import matplotlib.pyplot as plt
 
 # Wczytanie danych z pliku Excel
 data = pd.read_excel("2023 dane.xlsx")
@@ -72,7 +74,7 @@ def caqi_description(value):
     else: return "Bardzo zły"
 
 # Obliczanie CAQI
-def compute_caqi_row(row):
+def compute_caqi_row_train(row):
     values = []
     if 'PkRzeszPilsu-PM2.5-1g' in row: values.append(caqi_pm25(row['PkRzeszPilsu-PM2.5-1g']))
     if 'PkRzeszPilsu-PM10-1g' in row: values.append(caqi_pm10(row['PkRzeszPilsu-PM10-1g']))
@@ -84,7 +86,7 @@ def compute_caqi_row(row):
     return max(values) if values else None
 
 # Obliczanie CAQI dla każdej próbki
-data['CAQI'] = data.apply(compute_caqi_row, axis=1)
+data['CAQI'] = data.apply(compute_caqi_row_train, axis=1)
 
 # Usunięcie wierszy z brakiem wartości CAQI
 data = data.dropna(subset=['CAQI'])
@@ -107,13 +109,35 @@ model.fit(X_train, y_train)
 # Predykcja
 y_pred = model.predict(X_test)
 
+#Ważność cech – pobranie z modelu
+importance = model.feature_importances_
+feature_names = features
+
+# Stworzenie DataFrame z wynikami
+importance_df = pd.DataFrame({
+    'Cecha': feature_names,
+    'Waznosc': importance
+}).sort_values(by='Waznosc', ascending=False)
+
+# 👇 Wyświetlenie tabeli w terminalu / notebooku
+print("\nWażność cech według Random Forest:")
+print(importance_df)
+
+# 🔥 Wykres ważności cech
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Cecha'], importance_df['Waznosc'], color='lightgreen')
+plt.xlabel('Ważność')
+plt.title('Ważność cech w modelu Random Forest')
+plt.gca().invert_yaxis()  # Najważniejsze na górze
+plt.tight_layout()
+plt.show()
+
 # Ocena modelu - RMSE
 mse = mean_squared_error(y_test, y_pred)
 rmse = np.sqrt(mse)
 print(f'RMSE: {rmse:.2f}')
 
 # Zapisanie modelu
-import joblib
 joblib.dump(model, 'random_forest_regressor.model')
 
 # Przewidywanie dla nowych danych
@@ -137,3 +161,15 @@ historic_data['Predicted_CAQI_Desc'] = historic_data['Predicted_CAQI'].apply(caq
 # Zapisanie wyników do pliku CSV
 historic_data.to_csv('HistoricData_RandomForest_CAQI.csv', index=False)
 print("Przewidywania zostały zapisane do pliku HistoricData_RandomForest_CAQI.csv")
+
+
+# Przewidywanie dla nowych danych
+last24h_data = pd.read_csv('24HData_with_CAQI.csv')
+last24h_data['Predicted_CAQI'] = model.predict(last24h_data[features])
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+last24h_data['Predicted_CAQI_Desc'] = last24h_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+last24h_data.to_csv('24HData_RandomForest_CAQI.csv', index=False)
+print("Przewidywania zostały zapisane do pliku 24HData_RandomForest_CAQI.csv")

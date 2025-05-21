@@ -6,6 +6,12 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 import seaborn as sns
+from sklearn.model_selection import train_test_split
+import xgboost as xgb
+from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestRegressor
+import joblib
+from sklearn.tree import DecisionTreeRegressor
 
 '''
 PkRzeszPilsu-PM2.5-1 - 20277
@@ -266,6 +272,20 @@ def find_pollution_column(data, pollution):
         if pollution in col:
             return col
     return None
+def add_caqi_legend_custom(ax):
+    import matplotlib.patches as mpatches
+
+    labels_colors = [
+        ('Bardzo dobry (0–25)', (0, 1, 0, 0.2)),     # zielony
+        ('Dobry (25–50)', (1, 1, 0, 0.2)),           # żółty
+        ('Średni (50–75)', (1, 0.65, 0, 0.2)),       # pomarańczowy
+        ('Zły (75–100)', (1, 0, 0, 0.2)),            # czerwony
+        ('Bardzo zły (100+)', (0.5, 0, 0.5, 0.2)),   # fioletowy
+    ]
+
+    patches = [mpatches.Patch(color=color, label=label) for label, color in labels_colors]
+    ax.legend(handles=patches, loc='upper right', title="Skala CAQI")
+
 
 def TodaysCAQIPlot(data):
     data['Date'] = pd.to_datetime(data['Date'])
@@ -323,7 +343,8 @@ def TodaysCAQIPlot(data):
         else:
             plt.ylim(0, 100)
 
-        draw_caqi_background(plt)
+        draw_caqi_background(plt.gca())
+        add_caqi_legend_custom(plt.gca())
         plt.grid(True)
         plt.tight_layout()
         plt.show()
@@ -386,7 +407,8 @@ def HistoricCAQIPlot(data):
         else:
             plt.ylim(0, 100)
 
-        draw_caqi_background(plt)
+        draw_caqi_background(plt.gca())
+        add_caqi_legend_custom(plt.gca())
         plt.grid(True)
         plt.tight_layout()
         plt.show()
@@ -453,7 +475,8 @@ def CAQIPlot24h(data):
         max_caqi = plot_data['CAQI'].max()
         plt.ylim(0, max(100, max_caqi + 5))
 
-        draw_caqi_background(plt)
+        draw_caqi_background(plt.gca())
+        add_caqi_legend_custom(plt.gca())
         plt.grid(True)
         plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=1))
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
@@ -461,29 +484,31 @@ def CAQIPlot24h(data):
         plt.tight_layout()
         plt.show()
 
+
+
 df_today = getTodaysData()
 df_today = reorder_columns(df_today, column_order)
 df_today.to_csv('TodaysData.csv', index=False)
 
-'''
-df_historic=getHistoricDataOnly20Days("2025-01-01 00:00", "2025-01-15 00:00")
-df_historic = reorder_columns(df_historic, column_order)
-df_historic.to_csv('HistoricDataOnly20Days.csv', index=False)
+
+#df_historic=getHistoricDataOnly20Days("2025-01-01 00:00", "2025-01-15 00:00")
+#df_historic = reorder_columns(df_historic, column_order)
+#df_historic.to_csv('HistoricDataOnly20Days.csv', index=False)
 
 df_24h=get24hData()
 df_24h=reorder_columns(df_24h, column_order)
-df_24h.to_csv('24HData.csv', index=False)'''
+df_24h.to_csv('24HData.csv', index=False)
 
 
 df_today_with_caqi = add_caqi_column(df_today)
 df_today_with_caqi.to_csv("TodaysData_with_CAQI.csv", index=False)
 
-'''
-df_historic_with_caqi=add_caqi_column(df_historic)
-df_historic_with_caqi.to_csv("HistoricData_with_CAQI.csv", index=False)
+
+#df_historic_with_caqi=add_caqi_column(df_historic)
+#df_historic_with_caqi.to_csv("HistoricData_with_CAQI.csv", index=False)
 
 df_24h_with_caqi=add_caqi_column(df_24h)
-df_24h_with_caqi.to_csv("24HData_with_CAQI.csv",index=False)'''
+df_24h_with_caqi.to_csv("24HData_with_CAQI.csv",index=False)
 
 
 # Wczytanie pliku CSV do DataFrame
@@ -494,62 +519,19 @@ year2023=pd.read_csv("2023_data_with_CAQI.csv")
 weather=pd.read_csv("merged_energy_pollution_weather_arcus_6m.csv")
 
 
-'''
+
 # Wywołanie funkcji
 HistoricCAQIPlot(historic)
 TodaysCAQIPlot(today)
-CAQIPlot24h(last24h)'''
+CAQIPlot24h(last24h)
 
 #NOWA CZĘŚĆ
 
-def get_highest_caqi_component(data):
 
-    # Szukaj od końca pierwszego wiersza z jakimikolwiek danymi
-    last_valid_row = None
-    for i in range(len(data) - 1, -1, -1):
-        row = data.iloc[i]
-        if any(not pd.isna(row[col]) for col in sensor_column_map.keys()):
-            last_valid_row = row
-            break
 
-    if last_valid_row is None:
-        print("Brak dostępnych danych do analizy.")
-        return
+historic_corr= pd.read_csv("HistoricData_with_CAQI.csv")
 
-    # Przeliczenie CAQI dla każdego składnika
-    caqi_values = {}
-
-    for full_col_name, short_name in sensor_column_map.items():
-        value = pd.to_numeric(last_valid_row[full_col_name], errors='coerce')
-        if pd.isna(value):
-            continue
-        if short_name == 'PM2.5':
-            caqi = caqi_pm25(value)
-        elif short_name == 'PM10':
-            caqi = caqi_pm10(value)
-        elif short_name == 'CO':
-            caqi = caqi_co(value)
-        elif short_name == 'NO2':
-            caqi = caqi_no2(value)
-        elif short_name == 'O3':
-            caqi = caqi_o3(value)
-        elif short_name == 'SO2':
-            caqi = caqi_so2(value)
-        else:
-            caqi = None
-
-        if caqi is not None:
-            caqi_values[short_name] = caqi
-
-    # Znalezienie maksymalnego składnika
-    if caqi_values:
-        max_component = max(caqi_values, key=caqi_values.get)
-        max_value = caqi_values[max_component]
-        print(f"CAQI wynosi: {max_value:.2f}. Najwyższe zanieczyszczenie powietrza powoduje aktualnie {max_component}")
-    else:
-        print("Brak danych do obliczenia CAQI.")
-
-df_corr = historic.drop(columns=['Date', 'CAQI_Opis'])
+df_corr = historic_corr.drop(columns=['Date', 'CAQI_Opis'])
 # Oblicz korelację
 corr = df_corr.corr(method='pearson')  # Można też 'spearman'
 # Heatmapa
@@ -597,4 +579,410 @@ sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f")
 plt.title("Heatmapa korelacji między cechami (dane o jakości powietrza + pogoda)")
 plt.show()
 
+
+
+
+#PREDICTION
+# Wczytanie danych z pliku Excel
+data = pd.read_excel("2023 dane.xlsx")
+
+# Zamiana kolumny 'Date' na datę
+data['Date'] = pd.to_datetime(data['Date'], format='%d.%m.%Y %H:%M')
+
+# Zastąpienie brakujących wartości metodą interpolacji
+data.fillna(data.mean(), inplace=True)
+
+def compute_caqi_row_train(row):
+    values = []
+    if 'PkRzeszPilsu-PM2.5-1g' in row: values.append(caqi_pm25(row['PkRzeszPilsu-PM2.5-1g']))
+    if 'PkRzeszPilsu-PM10-1g' in row: values.append(caqi_pm10(row['PkRzeszPilsu-PM10-1g']))
+    if 'PkRzeszPilsu-CO-1g' in row: values.append(caqi_co(row['PkRzeszPilsu-CO-1g']))  # CO w mikrogramach, nie trzeba przeliczać
+    if 'PkRzeszPilsu-NO2-1g' in row: values.append(caqi_no2(row['PkRzeszPilsu-NO2-1g']))
+    if 'PkRzeszRejta-O3-1g' in row: values.append(caqi_o3(row['PkRzeszRejta-O3-1g']))
+    if 'PkRzeszRejta-SO2-1g' in row: values.append(caqi_so2(row['PkRzeszRejta-SO2-1g']))
+    values = [v for v in values if v is not None]
+    return max(values) if values else None
+
+# Obliczanie CAQI dla każdej próbki
+data['CAQI'] = data.apply(compute_caqi_row_train, axis=1)
+data.to_csv('2023_data_with_CAQI.csv', index=False)
+
+# Usunięcie wierszy z brakiem wartości CAQI (jeśli jakieś istnieją)
+data = data.dropna(subset=['CAQI'])
+
+# Zakładając, że cechy to zmienne zanieczyszczeń
+features = ['PkRzeszPilsu-PM2.5-1g', 'PkRzeszPilsu-PM10-1g', 'PkRzeszPilsu-CO-1g',
+            'PkRzeszPilsu-NO2-1g', 'PkRzeszRejta-O3-1g', 'PkRzeszRejta-SO2-1g']
+
+#XGBoost
+# Zmienna zależna to CAQI
+X = data[features]
+y = data['CAQI']
+
+# Podział na dane treningowe i testowe
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Stworzenie modelu regresyjnego XGBoost
+model = xgb.XGBRegressor(eval_metric='rmse')
+
+# Trenowanie modelu
+model.fit(X_train, y_train)
+
+# Predykcja
+y_pred = model.predict(X_test)
+
+# Ocena modelu - RMSE (manualnie obliczone)
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+print(f'RMSE: {rmse:.2f}')
+
+# Zapisanie modelu do pliku
+model.save_model('xgboost_regressor.model')
+
+
+
+#Ważność cech – pobranie z modelu
+importance = model.feature_importances_
+feature_names = features
+
+# Stworzenie DataFrame z wynikami
+importance_df = pd.DataFrame({
+    'Cecha': feature_names,
+    'Waznosc': importance
+}).sort_values(by='Waznosc', ascending=False)
+
+# Wyświetlenie tabeli w terminalu / notebooku
+print("\nWażność cech według XGBoost:")
+print(importance_df)
+
+# Wykres ważności cech
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Cecha'], importance_df['Waznosc'], color='skyblue')
+plt.xlabel('Ważność')
+plt.title('Ważność cech w modelu XGBoost')
+plt.gca().invert_yaxis()  # Najważniejsze na górze
+plt.tight_layout()
+plt.savefig('XGBoost_Feature_Importance.png')  # Zapisz wykres do pliku
+plt.show()
+
+
+# Przewidywanie dla nowych danych
+todays_data = pd.read_csv('TodaysData_with_CAQI.csv')
+
+features = ['PkRzeszPilsu-PM2.5-1g', 'PkRzeszPilsu-PM10-1g', 'PkRzeszPilsu-CO-1g',
+            'PkRzeszPilsu-NO2-1g', 'PkRzeszRejta-O3-1g', 'PkRzeszRejta-SO2-1g']
+
+
+# Funkcja, która oblicza CAQI tylko na podstawie dostępnych danych
+def predict_caqi(row):
+    # Jeśli wszystkie wartości w wierszu są puste, zwróć NaN
+    if row.isna().sum() == len(row):
+        return np.nan
+
+    # Sprawdzamy, czy są brakujące wartości w row
+    missing_features = row.isna().sum()
+
+    # Jeśli brakujące dane są, to można wypełnić brakujące wartości na przykład zerem
+    if missing_features > 0:
+        row = row.fillna(0)
+
+    # Upewniamy się, że wiersz ma dokładnie 6 cech przed przewidywaniem
+    if len(row) == 6:
+        return model.predict([row])[0]
+    else:
+        return np.nan
+
+
+# Przewidywanie wartości CAQI z uwzględnieniem braku zanieczyszczeń
+todays_data['Predicted_CAQI'] = todays_data[features].apply(predict_caqi, axis=1)
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+todays_data['Predicted_CAQI_Desc'] = todays_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+todays_data.to_csv('TodaysData_XGBoost_CAQI.csv', index=False)
+
+print("Przewidywania zostały zapisane do pliku TodaysData_XGBoost_CAQI.csv")
+
+
+
+
+
+# Przewidywanie dla danych historycznych
+historic_data = pd.read_csv('HistoricData_with_CAQI.csv')
+
+# Przewidywanie wartości CAQI z uwzględnieniem braku zanieczyszczeń
+historic_data['Predicted_CAQI'] = historic_data[features].apply(predict_caqi, axis=1)
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+historic_data['Predicted_CAQI_Desc'] = historic_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+historic_data.to_csv('HistoricData_XGBoost_CAQI.csv', index=False)
+
+print("Przewidywania zostały zapisane do pliku HistoricData_XGBoost_CAQI.csv")
+
+
+# Przewidywanie dla danych historycznych
+last24h_data = pd.read_csv('24HData_with_CAQI.csv')
+
+# Przewidywanie wartości CAQI z uwzględnieniem braku zanieczyszczeń
+last24h_data['Predicted_CAQI'] = last24h_data[features].apply(predict_caqi, axis=1)
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+last24h_data['Predicted_CAQI_Desc'] = last24h_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+last24h_data.to_csv('24HData_XGBoost_CAQI.csv', index=False)
+
+print("Przewidywania zostały zapisane do pliku 24HData_XGBoost_CAQI.csv")
+
+#RANDOM FOREST
+X = data[features]
+y = data['CAQI']
+
+# Podział na dane treningowe i testowe
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Tworzenie modelu Random Forest Regressor
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+
+# Trenowanie modelu
+model.fit(X_train, y_train)
+
+# Predykcja
+y_pred = model.predict(X_test)
+
+#Ważność cech – pobranie z modelu
+importance = model.feature_importances_
+feature_names = features
+
+# Stworzenie DataFrame z wynikami
+importance_df = pd.DataFrame({
+    'Cecha': feature_names,
+    'Waznosc': importance
+}).sort_values(by='Waznosc', ascending=False)
+
+# Wyświetlenie tabeli w terminalu / notebooku
+print("\nWażność cech według Random Forest:")
+print(importance_df)
+
+# Wykres ważności cech
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Cecha'], importance_df['Waznosc'], color='lightgreen')
+plt.xlabel('Ważność')
+plt.title('Ważność cech w modelu Random Forest')
+plt.gca().invert_yaxis()  # Najważniejsze na górze
+plt.tight_layout()
+plt.show()
+
+# Ocena modelu - RMSE
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+print(f'RMSE: {rmse:.2f}')
+
+# Zapisanie modelu
+joblib.dump(model, 'random_forest_regressor.model')
+
+# Przewidywanie dla nowych danych
+todays_data = pd.read_csv('TodaysData_with_CAQI.csv')
+todays_data['Predicted_CAQI'] = model.predict(todays_data[features])
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+todays_data['Predicted_CAQI_Desc'] = todays_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+todays_data.to_csv('TodaysData_RandomForest_CAQI.csv', index=False)
+print("Przewidywania zostały zapisane do pliku TodaysData_RandomForest_CAQI.csv")
+
+# Przewidywanie dla nowych danych
+historic_data = pd.read_csv('HistoricData_with_CAQI.csv')
+historic_data['Predicted_CAQI'] = model.predict(historic_data[features])
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+historic_data['Predicted_CAQI_Desc'] = historic_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+historic_data.to_csv('HistoricData_RandomForest_CAQI.csv', index=False)
+print("Przewidywania zostały zapisane do pliku HistoricData_RandomForest_CAQI.csv")
+
+
+# Przewidywanie dla nowych danych
+last24h_data = pd.read_csv('24HData_with_CAQI.csv')
+last24h_data['Predicted_CAQI'] = model.predict(last24h_data[features])
+
+# Dodanie kolumny Predicted_CAQI_Desc z opisami
+last24h_data['Predicted_CAQI_Desc'] = last24h_data['Predicted_CAQI'].apply(caqi_description)
+
+# Zapisanie wyników do pliku CSV
+last24h_data.to_csv('24HData_RandomForest_CAQI.csv', index=False)
+print("Przewidywania zostały zapisane do pliku 24HData_RandomForest_CAQI.csv")
+
+# Usunięcie wierszy, gdzie brak wszystkich pomiarów
+data = data.dropna(subset=features, how='all')
+
+# Obliczenie CAQI
+data['CAQI_PM2.5'] = data['PkRzeszPilsu-PM2.5-1g'].apply(caqi_pm25)
+data['CAQI_PM10'] = data['PkRzeszPilsu-PM10-1g'].apply(caqi_pm10)
+data['CAQI_NO2'] = data['PkRzeszPilsu-NO2-1g'].apply(caqi_no2)
+data['CAQI_O3'] = data['PkRzeszRejta-O3-1g'].apply(caqi_o3)
+data['CAQI_CO'] = data['PkRzeszPilsu-CO-1g'].apply(caqi_co)
+
+# Użycie najwyższej wartości
+data['CAQI'] = data[['CAQI_PM2.5', 'CAQI_PM10', 'CAQI_NO2', 'CAQI_O3', 'CAQI_CO']].max(axis=1)
+
+# Teraz już masz CAQI, więc możesz trenować:
+X = data[features].fillna(0)
+y = data['CAQI']
+
+# Model
+tree_model = DecisionTreeRegressor(random_state=42)
+tree_model.fit(X, y)
+
+# Zapis modelu
+joblib.dump(tree_model, 'decision_tree_regressor.pkl')
+print("Model drzewa decyzyjnego został zapisany.")
+
+#Ważność cech – z drzewa decyzyjnego
+importance = tree_model.feature_importances_
+feature_names = features
+
+# Tworzenie tabeli DataFrame
+importance_df = pd.DataFrame({
+    'Cecha': feature_names,
+    'Waznosc': importance
+}).sort_values(by='Waznosc', ascending=False)
+
+# Wyświetlenie tabeli
+print("\nWażność cech według Decision Tree:")
+print(importance_df)
+
+#Wykres ważności
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Cecha'], importance_df['Waznosc'], color='skyblue')
+plt.xlabel('Ważność')
+plt.title('Ważność cech w modelu Decision Tree')
+plt.gca().invert_yaxis()
+plt.tight_layout()
+plt.show()
+
+# Funkcja przewidująca
+def predict_caqi(row):
+    if row.isna().sum() == len(row):
+        return np.nan
+    row_filled = row.fillna(0)
+    row_df = pd.DataFrame([row_filled], columns=features)  # <<< UWAGA: przekazanie DataFrame z nazwami cech
+    return tree_model.predict(row_df)[0]
+
+# Przewidywanie dla dzisiejszych danych
+todays_data = pd.read_csv('TodaysData_with_CAQI.csv')
+
+todays_data['Predicted_CAQI'] = todays_data[features].apply(predict_caqi, axis=1)
+todays_data['Predicted_CAQI_Desc'] = todays_data['Predicted_CAQI'].apply(caqi_description)
+
+todays_data.to_csv('TodaysData_DecisionTree_CAQI.csv', index=False)
+print("Przewidywania dla Today's Data zapisane.")
+
+# Przewidywanie dla danych historycznych
+historic_data = pd.read_csv('HistoricData_with_CAQI.csv')
+
+historic_data['Predicted_CAQI'] = historic_data[features].apply(predict_caqi, axis=1)
+historic_data['Predicted_CAQI_Desc'] = historic_data['Predicted_CAQI'].apply(caqi_description)
+
+historic_data.to_csv('HistoricData_DecisionTree_CAQI.csv', index=False)
+print("Przewidywania dla danych historycznych zapisane.")
+
+
+
+# Przewidywanie dla danych historycznych
+last24h_data = pd.read_csv('24HData_with_CAQI.csv')
+
+last24h_data['Predicted_CAQI'] = last24h_data[features].apply(predict_caqi, axis=1)
+last24h_data['Predicted_CAQI_Desc'] = last24h_data['Predicted_CAQI'].apply(caqi_description)
+
+last24h_data.to_csv('24HData_DecisionTree_CAQI.csv', index=False)
+print("Przewidywania dla danych 24-godzinnych zapisane.")
+
+def get_highest_caqi_component(data):
+    # Analiza danych rzeczywistych (z czujników)
+    last_valid_row = None
+    for i in range(len(data) - 1, -1, -1):
+        row = data.iloc[i]
+        if any(not pd.isna(row[col]) for col in sensor_column_map.keys()):
+            last_valid_row = row
+            break
+
+    if last_valid_row is None:
+        print("Brak dostępnych danych do analizy (rzeczywiste pomiary).")
+    else:
+        caqi_values = {}
+        concentrations = {}
+
+        for full_col_name, short_name in sensor_column_map.items():
+            value = pd.to_numeric(last_valid_row[full_col_name], errors='coerce')
+            if pd.isna(value):
+                continue
+            if short_name == 'PM2.5':
+                caqi = caqi_pm25(value)
+            elif short_name == 'PM10':
+                caqi = caqi_pm10(value)
+            elif short_name == 'CO':
+                caqi = caqi_co(value)
+            elif short_name == 'NO2':
+                caqi = caqi_no2(value)
+            elif short_name == 'O3':
+                caqi = caqi_o3(value)
+            elif short_name == 'SO2':
+                caqi = caqi_so2(value)
+            else:
+                caqi = None
+
+            if caqi is not None:
+                caqi_values[short_name] = caqi
+                concentrations[short_name] = value
+
+        if caqi_values:
+            max_component = max(caqi_values, key=caqi_values.get)
+            max_caqi = caqi_values[max_component]
+            max_value = concentrations[max_component]
+            caqi_desc = caqi_description(max_caqi)
+
+            print("\n>>> Dane rzeczywiste (czujniki):")
+            print(f"CAQI wynosi: {max_caqi:.2f} ({caqi_desc}).")
+            print(f"Największy wpływ ma składnik: {max_component}, stężenie: {max_value:.2f} µg/m³.")
+        else:
+            print("Brak danych do obliczenia CAQI (rzeczywiste pomiary).")
+
+    # Analiza danych przewidywanych z modeli
+    model_files = {
+        "Drzewo decyzyjne": "TodaysData_DecisionTree_CAQI.csv",
+        "XGBoost": "TodaysData_XGBoost_CAQI.csv",
+        "Random Forest": "TodaysData_RandomForest_CAQI.csv"
+    }
+
+    for model_name, filename in model_files.items():
+        try:
+            model_data = pd.read_csv(filename)
+            # Znalezienie ostatniego wiersza z wartością Predicted_CAQI
+            last_valid_row = None
+            for i in range(len(model_data) - 1, -1, -1):
+                row = model_data.iloc[i]
+                if not pd.isna(row.get("Predicted_CAQI", None)):
+                    last_valid_row = row
+                    break
+
+            if last_valid_row is not None:
+                caqi = last_valid_row['Predicted_CAQI']
+                desc = last_valid_row.get('Predicted_CAQI_Desc', 'brak opisu')
+                print(f"\n>>> Model: {model_name}")
+                print(f"Przewidywane CAQI: {caqi:.2f} ({desc})")
+            else:
+                print(f"\n>>> Model: {model_name}")
+                print("Brak danych do analizy (brak Predicted_CAQI).")
+        except FileNotFoundError:
+            print(f"\n>>> Model: {model_name}")
+            print(f"Plik {filename} nie został znaleziony.")
+        except Exception as e:
+            print(f"\n>>> Model: {model_name}")
+            print(f"Wystąpił błąd podczas przetwarzania pliku {filename}: {e}")
 get_highest_caqi_component(today)

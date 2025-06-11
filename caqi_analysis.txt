@@ -1,0 +1,202 @@
+
+=== Analiza CAQI z 2025-06-11 12:45:07 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 32.88 (Dobry).
+Największy wpływ ma składnik: O3, stężenie: 78.90 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 32.90 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 34.92 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 32.88 (Dobry)
+
+=== Analiza CAQI z 2025-06-11 12:54:55 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 32.88 (Dobry).
+Największy wpływ ma składnik: O3, stężenie: 78.90 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 32.90 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 34.92 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 32.88 (Dobry)
+
+=== Analiza CAQI z 2025-06-11 13:01:01 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 32.88 (Dobry).
+Największy wpływ ma składnik: O3, stężenie: 78.90 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 32.90 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 34.92 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 17.62 (Bardzo dobry)
+
+=== Analiza CAQI z 2025-06-11 13:03:30 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 32.88 (Dobry).
+Największy wpływ ma składnik: O3, stężenie: 78.90 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 32.90 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 34.92 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 17.62 (Bardzo dobry)
+
+=== Analiza CAQI z 2025-06-11 13:13:25 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 32.88 (Dobry).
+Największy wpływ ma składnik: O3, stężenie: 78.90 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 32.90 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 34.92 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 17.62 (Bardzo dobry)
+
+=== Analiza CAQI z 2025-06-11 18:43:34 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 34.08 (Dobry).
+Największy wpływ ma składnik: O3, stężenie: 81.80 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 34.09 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.50 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 34.69 (Dobry)
+
+=== Analiza CAQI z 2025-06-11 18:54:33 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 34.08 (Dobry).
+
+Największy wpływ ma składnik: O3, stężenie: 81.80 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 34.09 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.50 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 34.69 (Dobry)
+
+=== Analiza CAQI z 2025-06-11 19:06:02 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 34.08 (Dobry).
+
+Największy wpływ ma składnik: O3, stężenie: 81.80 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 34.09 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.50 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 17.62 (Bardzo dobry)
+
+=== Analiza CAQI z 2025-06-11 19:08:01 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 34.08 (Dobry).
+
+Największy wpływ ma składnik: O3, stężenie: 81.80 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 34.09 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.50 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 17.62 (Bardzo dobry)
+
+=== Analiza CAQI z 2025-06-11 19:09:15 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 34.08 (Dobry).
+
+Największy wpływ ma składnik: O3, stężenie: 81.80 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 34.09 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.50 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 17.62 (Bardzo dobry)
+
+=== Analiza CAQI z 2025-06-11 19:19:02 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 33.04 (Dobry).
+
+Największy wpływ ma składnik: O3, stężenie: 79.30 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 33.06 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.11 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 33.05 (Dobry)
+
+=== Analiza CAQI z 2025-06-11 19:21:29 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 33.04 (Dobry).
+
+Największy wpływ ma składnik: O3, stężenie: 79.30 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 33.06 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.11 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 33.05 (Dobry)
+
+=== Analiza CAQI z 2025-06-11 19:23:34 ===
+
+>>> Dane rzeczywiste (czujniki):
+CAQI wynosi: 33.04 (Dobry).
+
+Największy wpływ ma składnik: O3, stężenie: 79.30 µg/m³.
+
+>>> Model: Drzewo decyzyjne
+Przewidywane CAQI: 33.06 (Dobry)
+
+>>> Model: XGBoost
+Przewidywane CAQI: 35.11 (Dobry)
+
+>>> Model: Random Forest
+Przewidywane CAQI: 33.05 (Dobry)

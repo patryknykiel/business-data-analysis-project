@@ -12,7 +12,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 import joblib
 from sklearn.tree import DecisionTreeRegressor
-
+import os
 '''
 PkRzeszPilsu-PM2.5-1 - 20277
 PkRzeszPilsu-PM10-1g - 16344
@@ -113,22 +113,24 @@ def getHistoricDataOnly20Days(dateFrom, dateTo):
     return pd.DataFrame(historicData)
 
 def get24hData():
-    PL_datetime_now = (datetime.datetime.today())
-    PL_datetime_24h_earlier = PL_datetime_now - datetime.timedelta(hours=24)
+    todayData = {
+        "Date": [],
+    }
+    for sensor in apiLinks:
+        dateList = []
+        valueList = []
+        response = requests.get(sensor + "?size=25").json()
+        data = response['Lista danych pomiarowych']
+        for i in range(len(data)):
+            dateList.append(data[i]['Data'])
+            valueList.append(data[i]['Wartość'])
 
-    PL_datetime_now_day = PL_datetime_now.date().day
-    PL_datetime_now_month = PL_datetime_now.date().month
-    PL_datetime_now_year = PL_datetime_now.date().year
-    PL_datetime_24h_earlier_day = PL_datetime_24h_earlier.date().day
-    PL_datetime_24h_earlier_month = PL_datetime_24h_earlier.date().month
-    PL_datetime_24h_earlier_year = PL_datetime_24h_earlier.date().year
-    PL_datetime_now_hour = PL_datetime_now.time().hour
-    PL_datetime_24h_earlier_hour = PL_datetime_24h_earlier.time().hour
+            if len(todayData["Date"]) == 0:
+                todayData.update({"Date": dateList})
+            todayData.update({data[i]['Kod stanowiska']: valueList})
 
-    adapted_PL_datetime_now = datetime.datetime(PL_datetime_now_year, PL_datetime_now_month, PL_datetime_now_day,PL_datetime_now_hour, 0 )
-    adapted_PL_PL_datetime_24h_earlier = datetime.datetime(PL_datetime_24h_earlier_year,PL_datetime_24h_earlier_month,PL_datetime_24h_earlier_day,PL_datetime_24h_earlier_hour, 0 )
+    return pd.DataFrame(todayData).sort_values(by=['Date'])
 
-    return getHistoricDataOnly20Days(adapted_PL_PL_datetime_24h_earlier, adapted_PL_datetime_now)
 
 # Stała kolejność kolumn, jaką chcesz uzyskać
 column_order = [
@@ -443,7 +445,7 @@ def CAQIPlot24h(data):
             elif pollution == 'PM10':
                 caqi = caqi_pm10(value)
             elif pollution == 'CO':
-                caqi = caqi_co_without_changing_units(value)
+                caqi = caqi_co(value)
             elif pollution == 'NO2':
                 caqi = caqi_no2(value)
             elif pollution == 'O3':
@@ -540,14 +542,6 @@ sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f")
 plt.title("Heatmapa korelacji między cechami (dane historyczne)")
 plt.show()
 
-df_corr = today.drop(columns=['Date', 'CAQI_Opis'])
-# Oblicz korelację
-corr = df_corr.corr(method='pearson')  # Można też 'spearman'
-# Heatmapa
-plt.figure(figsize=(10, 8))
-sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title("Heatmapa korelacji między cechami (dane dzisiejsze)")
-plt.show()
 
 
 df_corr = last24h.drop(columns=['Date', 'CAQI_Opis'])
@@ -578,9 +572,6 @@ plt.figure(figsize=(10, 8))
 sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f")
 plt.title("Heatmapa korelacji między cechami (dane o jakości powietrza + pogoda)")
 plt.show()
-
-
-
 
 #PREDICTION
 # Wczytanie danych z pliku Excel
@@ -651,7 +642,7 @@ importance_df = pd.DataFrame({
     'Waznosc': importance
 }).sort_values(by='Waznosc', ascending=False)
 
-# Wyświetlenie tabeli w terminalu / notebooku
+# Wyświetlenie tabeli w terminalu
 print("\nWażność cech według XGBoost:")
 print(importance_df)
 
@@ -835,9 +826,22 @@ data['CAQI'] = data[['CAQI_PM2.5', 'CAQI_PM10', 'CAQI_NO2', 'CAQI_O3', 'CAQI_CO'
 X = data[features].fillna(0)
 y = data['CAQI']
 
-# Model
+#tree
+
+# Podział na dane treningowe i testowe
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Stworzenie i trenowanie modelu
 tree_model = DecisionTreeRegressor(random_state=42)
-tree_model.fit(X, y)
+tree_model.fit(X_train, y_train)
+
+# Predykcja na danych testowych
+y_pred = tree_model.predict(X_test)
+
+
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+print(f'RMSE (Decision Tree): {rmse:.2f}')
 
 # Zapis modelu
 joblib.dump(tree_model, 'decision_tree_regressor.pkl')
@@ -903,8 +907,11 @@ last24h_data['Predicted_CAQI_Desc'] = last24h_data['Predicted_CAQI'].apply(caqi_
 last24h_data.to_csv('24HData_DecisionTree_CAQI.csv', index=False)
 print("Przewidywania dla danych 24-godzinnych zapisane.")
 
-def get_highest_caqi_component(data):
-    # Analiza danych rzeczywistych (z czujników)
+
+def get_highest_caqi_component(data, output_file="caqi_analysis.txt", csv_file="caqi_analysis.csv"):
+    real_data_result = None
+    model_results = []
+
     last_valid_row = None
     for i in range(len(data) - 1, -1, -1):
         row = data.iloc[i]
@@ -912,77 +919,244 @@ def get_highest_caqi_component(data):
             last_valid_row = row
             break
 
-    if last_valid_row is None:
-        print("Brak dostępnych danych do analizy (rzeczywiste pomiary).")
-    else:
-        caqi_values = {}
-        concentrations = {}
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        for full_col_name, short_name in sensor_column_map.items():
-            value = pd.to_numeric(last_valid_row[full_col_name], errors='coerce')
-            if pd.isna(value):
-                continue
-            if short_name == 'PM2.5':
-                caqi = caqi_pm25(value)
-            elif short_name == 'PM10':
-                caqi = caqi_pm10(value)
-            elif short_name == 'CO':
-                caqi = caqi_co(value)
-            elif short_name == 'NO2':
-                caqi = caqi_no2(value)
-            elif short_name == 'O3':
-                caqi = caqi_o3(value)
-            elif short_name == 'SO2':
-                caqi = caqi_so2(value)
-            else:
-                caqi = None
+    with open(output_file, 'a', encoding='utf-8') as f:
+        f.write(f"\n=== Analiza CAQI z {timestamp} ===\n")
 
-            if caqi is not None:
-                caqi_values[short_name] = caqi
-                concentrations[short_name] = value
-
-        if caqi_values:
-            max_component = max(caqi_values, key=caqi_values.get)
-            max_caqi = caqi_values[max_component]
-            max_value = concentrations[max_component]
-            caqi_desc = caqi_description(max_caqi)
-
-            print("\n>>> Dane rzeczywiste (czujniki):")
-            print(f"CAQI wynosi: {max_caqi:.2f} ({caqi_desc}).")
-            print(f"Największy wpływ ma składnik: {max_component}, stężenie: {max_value:.2f} µg/m³.")
+        if last_valid_row is None:
+            f.write("Brak dostępnych danych do analizy (rzeczywiste pomiary).\n")
         else:
-            print("Brak danych do obliczenia CAQI (rzeczywiste pomiary).")
+            caqi_values = {}
+            concentrations = {}
 
-    # Analiza danych przewidywanych z modeli
-    model_files = {
-        "Drzewo decyzyjne": "TodaysData_DecisionTree_CAQI.csv",
-        "XGBoost": "TodaysData_XGBoost_CAQI.csv",
-        "Random Forest": "TodaysData_RandomForest_CAQI.csv"
-    }
+            for full_col_name, short_name in sensor_column_map.items():
+                value = pd.to_numeric(last_valid_row[full_col_name], errors='coerce')
+                if pd.isna(value):
+                    continue
+                if short_name == 'PM2.5':
+                    caqi = caqi_pm25(value)
+                elif short_name == 'PM10':
+                    caqi = caqi_pm10(value)
+                elif short_name == 'CO':
+                    caqi = caqi_co(value)
+                elif short_name == 'NO2':
+                    caqi = caqi_no2(value)
+                elif short_name == 'O3':
+                    caqi = caqi_o3(value)
+                elif short_name == 'SO2':
+                    caqi = caqi_so2(value)
+                else:
+                    caqi = None
 
-    for model_name, filename in model_files.items():
-        try:
-            model_data = pd.read_csv(filename)
-            # Znalezienie ostatniego wiersza z wartością Predicted_CAQI
-            last_valid_row = None
-            for i in range(len(model_data) - 1, -1, -1):
-                row = model_data.iloc[i]
-                if not pd.isna(row.get("Predicted_CAQI", None)):
-                    last_valid_row = row
-                    break
+                if caqi is not None:
+                    caqi_values[short_name] = caqi
+                    concentrations[short_name] = value
 
-            if last_valid_row is not None:
-                caqi = last_valid_row['Predicted_CAQI']
-                desc = last_valid_row.get('Predicted_CAQI_Desc', 'brak opisu')
-                print(f"\n>>> Model: {model_name}")
-                print(f"Przewidywane CAQI: {caqi:.2f} ({desc})")
+            if caqi_values:
+                max_component = max(caqi_values, key=caqi_values.get)
+                max_caqi = caqi_values[max_component]
+                max_value = concentrations[max_component]
+                caqi_desc = caqi_description(max_caqi)
+
+                f.write("\n>>> Dane rzeczywiste (czujniki):\n")
+                f.write(f"CAQI wynosi: {max_caqi:.2f} ({caqi_desc}).\n")
+                f.write(f"\nNajwiększy wpływ ma składnik: {max_component}, stężenie: {max_value:.2f} µg/m³.\n")
+
+                print("\n>>> Dane rzeczywiste (czujniki):")
+                print(f"CAQI wynosi: {max_caqi:.2f} ({caqi_desc}).")
+                print(f"\nNajwiększy wpływ ma składnik: {max_component}, stężenie: {max_value:.2f} µg/m³.")
+
+                real_data_result = {
+                    'Timestamp': timestamp,
+                    'Source': 'Rzeczywiste',
+                    'CAQI': max_caqi,
+                    'Description': caqi_desc,
+                    'Main_Pollutant': max_component,
+                    'Concentration': max_value
+                }
             else:
+                f.write("Brak danych do obliczenia CAQI (rzeczywiste pomiary).\n")
+
+        model_files = {
+            "Drzewo decyzyjne": "TodaysData_DecisionTree_CAQI.csv",
+            "XGBoost": "TodaysData_XGBoost_CAQI.csv",
+            "Random Forest": "TodaysData_RandomForest_CAQI.csv"
+        }
+
+        for model_name, filename in model_files.items():
+            try:
+                model_data = pd.read_csv(filename)
+                last_valid_row = None
+                for i in range(len(model_data) - 1, -1, -1):
+                    row = model_data.iloc[i]
+                    if not pd.isna(row.get("Predicted_CAQI", None)):
+                        last_valid_row = row
+                        break
+
+                f.write(f"\n>>> Model: {model_name}\n")
                 print(f"\n>>> Model: {model_name}")
-                print("Brak danych do analizy (brak Predicted_CAQI).")
-        except FileNotFoundError:
-            print(f"\n>>> Model: {model_name}")
-            print(f"Plik {filename} nie został znaleziony.")
-        except Exception as e:
-            print(f"\n>>> Model: {model_name}")
-            print(f"Wystąpił błąd podczas przetwarzania pliku {filename}: {e}")
+
+                if last_valid_row is not None:
+                    caqi = last_valid_row['Predicted_CAQI']
+                    desc = last_valid_row.get('Predicted_CAQI_Desc', 'brak opisu')
+                    f.write(f"Przewidywane CAQI: {caqi:.2f} ({desc})\n")
+                    print(f"Przewidywane CAQI: {caqi:.2f} ({desc})")
+                else:
+                    f.write("Brak danych do analizy (brak Predicted_CAQI).\n")
+                    print("Brak danych do analizy (brak Predicted_CAQI).")
+
+            except FileNotFoundError:
+                f.write(f"\n>>> Model: {model_name}\n")
+                f.write(f"Plik {filename} nie został znaleziony.\n")
+                print(f"\n>>> Model: {model_name}")
+                print(f"Plik {filename} nie został znaleziony.")
+            except Exception as e:
+                f.write(f"\n>>> Model: {model_name}\n")
+                f.write(f"Wystąpił błąd podczas przetwarzania pliku {filename}: {e}\n")
+                print(f"\n>>> Model: {model_name}")
+                print(f"Wystąpił błąd podczas przetwarzania pliku {filename}: {e}")
+
+    # Zapis do CSV tylko dla danych rzeczywistych
+    if real_data_result:
+        results_df = pd.DataFrame([real_data_result])
+        results_df.to_csv(csv_file, mode='a', index=False, header=not os.path.exists(csv_file), encoding='utf-8')
+
+    print(f"\nWyniki zapisano do plików: {output_file} i {csv_file}")
+
 get_highest_caqi_component(today)
+
+
+# Definicja potencjalnych przyczyn dla zanieczyszczeń
+pollution_causes = {
+    'PM2.5': [
+        "Spalanie paliw stałych w gospodarstwach domowych (np. węgiel, drewno)",
+        "Emisje z pojazdów z silnikiem Diesla",
+        "Procesy przemysłowe, takie jak spalanie w fabrykach",
+        "Pył z placów budowy lub dróg"
+    ],
+    'PM10': [
+        "Pył drogowy wzbijany przez ruch pojazdów",
+        "Emisje z budownictwa i prac ziemnych",
+        "Spalanie w piecach węglowych",
+        "Naturalne źródła, takie jak pył z gleby lub piasku"
+    ],
+    'CO': [
+        "Niekompletne spalanie paliw w pojazdach",
+        "Ogrzewanie domowe (piece, kominki)",
+        "Emisje z procesów przemysłowych",
+        "Pożary lub spalanie odpadów"
+    ],
+    'NO2': [
+        "Spaliny z pojazdów, szczególnie z silnikiem Diesla",
+        "Emisje z elektrowni i zakładów przemysłowych",
+        "Spalanie paliw kopalnych w kotłowniach",
+        "Intensywny ruch drogowy w miastach"
+    ],
+    'O3': [
+        "Reakcje fotochemiczne w obecności promieniowania słonecznego",
+        "Wysokie temperatury i niska wilgotność",
+        "Emisje prekursorów (NOx i lotne związki organiczne) z pojazdów i przemysłu",
+        "Długotrwałe warunki bezwietrzne sprzyjające akumulacji ozonu"
+    ],
+    'SO2': [
+        "Spalanie węgla w elektrowniach i zakładach przemysłowych",
+        "Procesy przemysłowe, np. produkcja chemikaliów",
+        "Emisje z rafinerii ropy naftowej",
+        "Spalanie paliw siarkowych w kotłowniach"
+    ]
+}
+def analyze_caqi_components(row, model, features, sensor_column_map):
+    if row.isna().sum() == len(row):
+        return None, None, None, None
+
+    # Wypełnienie brakujących wartości zerami
+    row_filled = row.fillna(0).infer_objects(copy=False)
+    row_df = pd.DataFrame([row_filled], columns=features)
+
+    # Przewidywanie CAQI
+    predicted_caqi = model.predict(row_df)[0]
+    caqi_desc = caqi_description(predicted_caqi)
+
+    # Obliczenie CAQI dla każdego zanieczyszczenia
+    caqi_values = {}
+    concentrations = {}
+    for full_col_name, short_name in sensor_column_map.items():
+        value = pd.to_numeric(row[full_col_name], errors='coerce')
+        if pd.isna(value):
+            continue
+        if short_name == 'PM2.5':
+            caqi = caqi_pm25(value)
+        elif short_name == 'PM10':
+            caqi = caqi_pm10(value)
+        elif short_name == 'CO':
+            caqi = caqi_co(value)
+        elif short_name == 'NO2':
+            caqi = caqi_no2(value)
+        elif short_name == 'O3':
+            caqi = caqi_o3(value)
+        elif short_name == 'SO2':
+            caqi = caqi_so2(value)
+        else:
+            caqi = None
+
+        if caqi is not None:
+            caqi_values[short_name] = caqi
+            concentrations[short_name] = value
+
+    if not caqi_values:
+        return None, None, None, None
+
+    # Znalezienie zanieczyszczenia z największym CAQI
+    max_component = max(caqi_values, key=caqi_values.get)
+    max_caqi = caqi_values[max_component]
+    max_value = concentrations[max_component]
+    causes = pollution_causes.get(max_component, ["Brak informacji o przyczynach"])
+
+    return max_component, max_caqi, max_value, causes
+
+# Analiza ostatniego wiersza z danymi
+features = ['PkRzeszPilsu-PM2.5-1g', 'PkRzeszPilsu-PM10-1g', 'PkRzeszPilsu-CO-1g',
+            'PkRzeszPilsu-NO2-1g', 'PkRzeszRejta-O3-1g', 'PkRzeszRejta-SO2-1g']
+sensor_column_map = {
+    'PkRzeszPilsu-PM2.5-1g': 'PM2.5',
+    'PkRzeszPilsu-PM10-1g': 'PM10',
+    'PkRzeszPilsu-CO-1g': 'CO',
+    'PkRzeszPilsu-NO2-1g': 'NO2',
+    'PkRzeszRejta-O3-1g': 'O3',
+    'PkRzeszRejta-SO2-1g': 'SO2'
+}
+
+last_valid_row = None
+for i in range(len(today) - 1, -1, -1):
+    row = today.iloc[i]
+    if any(not pd.isna(row[col]) for col in sensor_column_map.keys()):
+        last_valid_row = row
+        break
+
+if last_valid_row is not None:
+    max_component, max_caqi, max_value, causes = analyze_caqi_components(last_valid_row[features], tree_model, features, sensor_column_map)
+    if max_component:
+        print(f"\nNajwiększy wpływ na CAQI ma: {max_component}")
+        print(f"CAQI dla tego składnika: {max_caqi:.2f}")
+        print(f"Stężenie: {max_value:.2f} µg/m³")
+        print("Potencjalne przyczyny:")
+        for cause in causes:
+            print(f"- {cause}")
+else:
+    print("Brak dostępnych danych do analizy.")
+
+
+
+# Zapis wyników do pliku
+with open('caqi_component_analysis.txt', 'w', encoding='utf-8') as f:
+    if last_valid_row is not None and max_component:
+        f.write(f"Największy wpływ na CAQI ma: {max_component}\n")
+        f.write(f"CAQI dla tego składnika: {max_caqi:.2f}\n")
+        f.write(f"Stężenie: {max_value:.2f} µg/m³\n")
+        f.write("Potencjalne przyczyny:\n")
+        for cause in causes:
+            f.write(f"- {cause}\n")
+
+    else:
+        f.write("Brak dostępnych danych do analizy.\n")

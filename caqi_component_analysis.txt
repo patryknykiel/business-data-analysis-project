@@ -1,0 +1,8 @@
+Największy wpływ na CAQI ma: O3
+CAQI dla tego składnika: 33.04
+Stężenie: 79.30 µg/m³
+Potencjalne przyczyny:
+- Reakcje fotochemiczne w obecności promieniowania słonecznego
+- Wysokie temperatury i niska wilgotność
+- Emisje prekursorów (NOx i lotne związki organiczne) z pojazdów i przemysłu
+- Długotrwałe warunki bezwietrzne sprzyjające akumulacji ozonu
